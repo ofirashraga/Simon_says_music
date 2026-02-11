@@ -74,24 +74,15 @@
         }
 
         .level-btn {
-            padding: 12px;
+            padding: 10px;
             border: 3px solid #667eea;
             background: white;
             border-radius: 10px;
             cursor: pointer;
-            font-size: 0.9em;
+            font-size: 0.85em;
             font-weight: bold;
             color: #667eea;
             transition: all 0.3s;
-        }
-        
-        .level-btn:nth-child(4),
-        .level-btn:nth-child(5) {
-            grid-column: span 1;
-        }
-        
-        .level-btn:nth-child(4) {
-            margin-left: 25%;
         }
 
         .level-btn:hover {
@@ -213,6 +204,101 @@
             left: 50%;
             transform: translate(-50%, -50%);
             display: block;
+        }
+
+        /* Rotating mode - 8 circles rotating in a circle */
+        .game-board.rotating-mode {
+            animation: none;
+        }
+
+        .game-board.rotating-mode .color-btn {
+            display: none; /* Hide original buttons */
+        }
+
+        /* Chaos mode - same as rotating but with changing sequences */
+        .game-board.chaos-mode {
+            animation: none;
+        }
+
+        .game-board.chaos-mode .color-btn {
+            display: none; /* Hide original buttons */
+        }
+
+        .rotating-circles-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            display: none;
+        }
+
+        .game-board.rotating-mode .rotating-circles-container {
+            display: block;
+            animation: rotate-clockwise 60s linear infinite;
+        }
+
+        .game-board.chaos-mode .rotating-circles-container {
+            display: block;
+            animation: rotate-clockwise 60s linear infinite;
+        }
+
+        .game-board.chaos-mode .rotating-circles-container.reverse {
+            animation: rotate-counterclockwise 60s linear infinite;
+        }
+
+        @keyframes rotate-clockwise {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @keyframes rotate-counterclockwise {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(-360deg); }
+        }
+
+        .rotating-circle {
+            position: absolute;
+            width: 18%;
+            height: 18%;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 50%, #95a5a6 100%);
+            border: 4px solid #2c3e50;
+            box-shadow: 
+                inset 0 -4px 8px rgba(0,0,0,0.3),
+                inset 0 4px 8px rgba(255,255,255,0.2),
+                0 6px 15px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .rotating-circle:hover {
+            transform: scale(1.1);
+        }
+
+        .rotating-circle.lit {
+            background: linear-gradient(135deg, #f39c12 0%, #f1c40f 50%, #f39c12 100%);
+            box-shadow: 
+                inset 0 0 20px rgba(255,255,255,0.8),
+                0 0 30px rgba(241, 196, 15, 0.8),
+                0 6px 15px rgba(0,0,0,0.3);
+        }
+
+        .rotating-circle.clicked-correct {
+            background: linear-gradient(135deg, #27ae60 0%, #2ecc71 50%, #27ae60 100%);
+            box-shadow: 
+                inset 0 0 20px rgba(255,255,255,0.8),
+                0 0 30px rgba(46, 204, 113, 0.8);
+        }
+
+        .rotating-circle.clicked-wrong {
+            background: linear-gradient(135deg, #c0392b 0%, #e74c3c 50%, #c0392b 100%);
+            box-shadow: 
+                inset 0 0 20px rgba(255,255,255,0.8),
+                0 0 30px rgba(231, 76, 60, 0.8);
         }
 
         .color-btn {
@@ -417,6 +503,12 @@
             <button class="level-btn" data-level="expert">
                 💎 מומחה<br><small>(5 צבעים)</small>
             </button>
+            <button class="level-btn" data-level="rotating">
+                🔄 מסתובב<br><small>(8 עיגולים)</small>
+            </button>
+            <button class="level-btn" data-level="chaos">
+                ⚡ כאוס<br><small>(רצף משתנה)</small>
+            </button>
         </div>
 
         <div class="game-info">
@@ -440,6 +532,11 @@
             <button class="color-btn green" data-color="green"></button>
             <button class="color-btn yellow" data-color="yellow"></button>
             <button class="color-btn orange" data-color="orange"></button>
+            
+            <!-- Rotating mode circles -->
+            <div class="rotating-circles-container" id="rotating-container">
+                <!-- Will be populated by JavaScript -->
+            </div>
         </div>
 
         <div class="control-btns">
@@ -466,17 +563,37 @@
                     easy: 0,
                     medium: 0,
                     hard: 0,
-                    expert: 0
+                    expert: 0,
+                    rotating: 0,
+                    chaos: 0
                 };
                 this.speeds = {
                     animals: { show: 500, pause: 250 },
                     easy: { show: 400, pause: 200 },
                     medium: { show: 300, pause: 150 },
                     hard: { show: 200, pause: 100 },
-                    expert: { show: 200, pause: 100 }
+                    expert: { show: 200, pause: 100 },
+                    rotating: { show: 600, pause: 300 },
+                    chaos: { show: 600, pause: 300 }
                 };
                 this.baseColors = ['red', 'blue', 'green', 'yellow'];
                 this.colors = this.baseColors;
+                this.rotatingCircles = 8;
+                this.rotatingFrequencies = [
+                    262, // C4
+                    294, // D4
+                    330, // E4
+                    349, // F4
+                    392, // G4
+                    440, // A4
+                    494, // B4
+                    523  // C5
+                ];
+                this.chaosRoundsCompleted = 0;
+                this.chaosTotalRounds = 0; // Total successful rounds for direction change
+                this.chaosDirection = 'clockwise';
+                
+                this.createRotatingCircles();
                 this.sounds = this.createSounds();
                 
                 this.loadBestScores();
@@ -509,6 +626,23 @@
                     play: (color) => {
                         if (this.difficulty === 'animals') {
                             playAnimalSound(color);
+                        } else if (this.difficulty === 'rotating' || this.difficulty === 'chaos') {
+                            // Play musical note for rotating circles
+                            const index = parseInt(color.replace('circle', ''));
+                            const oscillator = audioContext.createOscillator();
+                            const gainNode = audioContext.createGain();
+                            
+                            oscillator.connect(gainNode);
+                            gainNode.connect(audioContext.destination);
+                            
+                            oscillator.frequency.value = this.rotatingFrequencies[index];
+                            oscillator.type = 'sine';
+                            
+                            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+                            
+                            oscillator.start(audioContext.currentTime);
+                            oscillator.stop(audioContext.currentTime + 0.4);
                         } else {
                             const oscillator = audioContext.createOscillator();
                             const gainNode = audioContext.createGain();
@@ -802,6 +936,28 @@
                 });
             }
 
+            createRotatingCircles() {
+                const container = document.getElementById('rotating-container');
+                const radius = 40; // percentage from center
+                
+                for (let i = 0; i < this.rotatingCircles; i++) {
+                    const angle = (i * 360 / this.rotatingCircles) * (Math.PI / 180);
+                    const x = 50 + radius * Math.cos(angle - Math.PI / 2);
+                    const y = 50 + radius * Math.sin(angle - Math.PI / 2);
+                    
+                    const circle = document.createElement('div');
+                    circle.className = 'rotating-circle';
+                    circle.dataset.index = i;
+                    circle.style.left = `${x}%`;
+                    circle.style.top = `${y}%`;
+                    circle.style.transform = 'translate(-50%, -50%)';
+                    
+                    circle.addEventListener('click', () => this.handleRotatingCircleClick(i));
+                    
+                    container.appendChild(circle);
+                }
+            }
+
             setDifficulty(level) {
                 if (this.isPlaying) return;
                 
@@ -809,14 +965,27 @@
                 
                 const gameBoard = document.querySelector('.game-board');
                 
+                // Remove all mode classes first
+                gameBoard.classList.remove('expert-mode', 'rotating-mode', 'chaos-mode');
+                
                 // Update colors and layout based on difficulty
                 if (level === 'expert') {
                     this.colors = ['red', 'blue', 'green', 'yellow', 'orange'];
                     gameBoard.classList.add('expert-mode');
                     document.querySelector('.color-btn.orange').style.display = 'block';
+                } else if (level === 'rotating') {
+                    gameBoard.classList.add('rotating-mode');
+                    this.colors = Array.from({ length: this.rotatingCircles }, (_, i) => `circle${i}`);
+                    document.querySelector('.color-btn.orange').style.display = 'none';
+                } else if (level === 'chaos') {
+                    gameBoard.classList.add('chaos-mode');
+                    this.colors = Array.from({ length: this.rotatingCircles }, (_, i) => `circle${i}`);
+                    this.chaosRoundsCompleted = 0;
+                    this.chaosTotalRounds = 0;
+                    this.chaosDirection = 'clockwise';
+                    document.querySelector('.color-btn.orange').style.display = 'none';
                 } else {
                     this.colors = this.baseColors;
-                    gameBoard.classList.remove('expert-mode');
                     document.querySelector('.color-btn.orange').style.display = 'none';
                 }
                 
@@ -843,13 +1012,60 @@
                 this.updateBestScoreDisplay();
             }
 
+            handleRotatingCircleClick(index) {
+                if (!this.isPlaying || this.isShowingSequence) return;
+                
+                const color = `circle${index}`;
+                const circle = document.querySelector(`.rotating-circle[data-index="${index}"]`);
+                
+                // Flash and play sound
+                circle.classList.add('lit');
+                this.sounds.play(color);
+                setTimeout(() => circle.classList.remove('lit'), 200);
+                
+                this.playerSequence.push(color);
+                
+                const currentIndex = this.playerSequence.length - 1;
+                
+                if (this.playerSequence[currentIndex] !== this.sequence[currentIndex]) {
+                    circle.classList.add('clicked-wrong');
+                    setTimeout(() => circle.classList.remove('clicked-wrong'), 500);
+                    this.gameOver();
+                    return;
+                }
+                
+                circle.classList.add('clicked-correct');
+                setTimeout(() => circle.classList.remove('clicked-correct'), 300);
+                
+                if (this.playerSequence.length === this.sequence.length) {
+                    // Increment chaos rounds counter
+                    if (this.difficulty === 'chaos') {
+                        this.chaosRoundsCompleted++;
+                        this.chaosTotalRounds++; // Count every successful round
+                        
+                        // Increase level only after completing enough rounds
+                        // 3 sounds = 3 rounds, 4 sounds = 4 rounds, etc.
+                        if (this.chaosRoundsCompleted >= this.level) {
+                            this.level++;
+                            this.chaosRoundsCompleted = 0;
+                        }
+                    } else {
+                        this.level++;
+                    }
+                    
+                    setTimeout(() => this.nextRound(), 500);
+                }
+            }
+
             updateBestScoreDisplay() {
                 const levelNames = {
                     animals: 'חיות',
                     easy: 'קל',
                     medium: 'בינוני',
                     hard: 'מאתגר',
-                    expert: 'מומחה'
+                    expert: 'מומחה',
+                    rotating: 'מסתובב',
+                    chaos: 'כאוס'
                 };
                 document.getElementById('level-best').textContent = 
                     `שיא ברמה ${levelNames[this.difficulty]}: ${this.bestScores[this.difficulty]}`;
@@ -885,9 +1101,20 @@
                 if (this.isPlaying) return;
                 
                 this.isPlaying = true;
-                this.level = 1;
                 this.sequence = [];
                 document.getElementById('start-btn').disabled = true;
+                
+                // For rotating and chaos modes, start with 3 circles instead of 1
+                if (this.difficulty === 'rotating' || this.difficulty === 'chaos') {
+                    this.level = 3;
+                    if (this.difficulty === 'chaos') {
+                        this.chaosRoundsCompleted = 0;
+                        this.chaosTotalRounds = 0;
+                        this.chaosDirection = 'clockwise';
+                    }
+                } else {
+                    this.level = 1;
+                }
                 
                 this.showMessage('המשחק מתחיל! שימי לב...', 'info');
                 await this.sleep(1000);
@@ -897,8 +1124,42 @@
 
             async nextRound() {
                 this.playerSequence = [];
-                const newColor = this.colors[Math.floor(Math.random() * this.colors.length)];
-                this.sequence.push(newColor);
+                
+                // For chaos mode, create completely new sequence each round
+                if (this.difficulty === 'chaos') {
+                    this.sequence = [];
+                    for (let i = 0; i < this.level; i++) {
+                        const newColor = this.colors[Math.floor(Math.random() * this.colors.length)];
+                        this.sequence.push(newColor);
+                    }
+                    
+                    // Change direction every 4 total successful rounds
+                    if (this.chaosTotalRounds > 0 && this.chaosTotalRounds % 4 === 0) {
+                        this.chaosDirection = this.chaosDirection === 'clockwise' ? 'counterclockwise' : 'clockwise';
+                        const container = document.getElementById('rotating-container');
+                        if (this.chaosDirection === 'counterclockwise') {
+                            container.classList.add('reverse');
+                            this.showMessage(`כיוון הסיבוב התהפך! ⤵️`, 'info');
+                            await this.sleep(1500);
+                        } else {
+                            container.classList.remove('reverse');
+                            this.showMessage(`כיוון הסיבוב התהפך! ⤴️`, 'info');
+                            await this.sleep(1500);
+                        }
+                    }
+                }
+                // For rotating mode starting from level 3, build the initial sequence
+                else if (this.difficulty === 'rotating' && this.sequence.length === 0) {
+                    for (let i = 0; i < this.level; i++) {
+                        const newColor = this.colors[Math.floor(Math.random() * this.colors.length)];
+                        this.sequence.push(newColor);
+                    }
+                } 
+                // Regular modes - add one to sequence
+                else {
+                    const newColor = this.colors[Math.floor(Math.random() * this.colors.length)];
+                    this.sequence.push(newColor);
+                }
                 
                 document.getElementById('current-level').textContent = this.level;
                 this.showMessage(`רמה ${this.level} - שימי לב לרצף!`, 'waiting');
@@ -925,12 +1186,22 @@
             }
 
             async flashColor(color, duration) {
-                const btn = document.querySelector(`[data-color="${color}"]`);
-                btn.classList.add('active-flash');
-                this.sounds.play(color);
-                
-                await this.sleep(duration);
-                btn.classList.remove('active-flash');
+                if (this.difficulty === 'rotating' || this.difficulty === 'chaos') {
+                    const index = parseInt(color.replace('circle', ''));
+                    const circle = document.querySelector(`.rotating-circle[data-index="${index}"]`);
+                    circle.classList.add('lit');
+                    this.sounds.play(color);
+                    
+                    await this.sleep(duration);
+                    circle.classList.remove('lit');
+                } else {
+                    const btn = document.querySelector(`[data-color="${color}"]`);
+                    btn.classList.add('active-flash');
+                    this.sounds.play(color);
+                    
+                    await this.sleep(duration);
+                    btn.classList.remove('active-flash');
+                }
             }
 
             handleColorClick(color) {
